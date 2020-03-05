@@ -1058,6 +1058,8 @@ class SeqRecord:
             letter_annotations=self.letter_annotations.copy(),
         )
     def rotate(self, shift):
+        if (self.annotations["topology"]!="circular"):
+            raise Exception("Topology is not circular!")
         #Shifta la sequenza
         self.seq = self.seq[shift:] + self.seq[:shift]
         #Aggiorna le posizioni delle features
