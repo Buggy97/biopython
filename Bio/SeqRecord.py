@@ -1057,6 +1057,15 @@ class SeqRecord:
             annotations=self.annotations.copy(),
             letter_annotations=self.letter_annotations.copy(),
         )
+    def rotate(self, shift):
+        #Shifta la sequenza
+        self.seq = self.seq[shift:] + self.seq[:shift]
+        #Aggiorna le posizioni delle features
+        for feature in self.features:
+            feature.location.rotate(shift, len(self.seq)+1)
+        #Aggiorna le per letter_annotation
+        for arr in self.letter_annotations:
+            arr = arr[shift:] + arr[:shift]
 
     def reverse_complement(
         self,

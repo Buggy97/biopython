@@ -1038,6 +1038,48 @@ class FeatureLocation:
             strand=flip_strand,
         )
 
+    def _shift_position(self, position, shift, N):
+        #Caso ExactPosition
+        if type(position)==ExactPosition:
+            position_new = (int(position) + shift) % N
+            return ExactPosition(position_new)
+        if type(position)==UncertainPosition:
+            position_new = (int(position) + shift) % N
+            return UncertainPosition(position_new)
+        #Caso UnknownPosition
+        if type(position)==UnknownPosition:
+            return position
+        #Caso WithinPosition
+        if type(position)==WithinPosition:
+            position_curr_default = int(position)
+            #Ricava il valore di left right usando la rappresentazione in stringa
+            #Elimina le parentesi e converte i valori separati da punto in interi
+            position_curr_left_right = list(map(int, str(position)[1:-1].split('.'))) 
+
+            position_new_default = (position_curr_default + shift) % N
+            position_new_left = (position_curr_left_right[0] + shift) % N
+            position_new_right = (position_curr_left_right[1] + shift) % N
+
+            return WithinPosition(position_new_default, position_new_left, position_new_right)
+        #Caso BeforePosition
+        if type(position)==BeforePosition:
+            position_new = (int(position) + shift) % N
+            return BeforePosition(position_new)
+        #Caso AfterPosition
+        if type(position)==AfterPosition:
+            position_new = (int(position) + shift) % N
+            return AfterPosition(position_new)
+        #Caso OneOfPosition
+        if type(position)==OneOfPosition:
+            position_curr_default = int(position)
+            #Ricava il valore di left right usando la rappresentazione in stringa
+            #Elimina le parentesi e converte i valori separati da virgola in interi
+            position_new_default = (position_curr_default + shift) % N
+            new_choices = [self._shift_position(pos, shift, N) for pos in position.position_choices]
+            #Riordino le posizioni in base alla posizione
+            new_choices.sort()
+            return OneOfPosition(position_new_default, new_choices)
+
     @property
     def parts(self):
         """Read only list of sections (always one, the FeatureLocation object).
@@ -1095,6 +1137,19 @@ class FeatureLocation:
             if isinstance(self._end, UnknownPosition):
                 return None
             raise
+
+    def rotate(self, shift, N):
+        position_start = self._shift_position(self._start, shift, N)
+        position_end = self._shift_position(self._end, shift, N)
+        if (position_start > position_end):
+            #Get middle location
+            position_middle_1 = self._shift_position(self._start, -self._start, N)
+            position_middle_2 = self._shift_position(position_end, N-int(position_end)-1, N)
+            f1 = FeatureLocation(position_start, position_middle_2, self.strand)
+            f2 = FeatureLocation(position_middle_1, position_end, self.strand)
+            return CompoundLocation([f1, f2])
+        else:
+            return FeatureLocation(position_start, position_end, self.strand)
 
     def extract(self, parent_sequence):
         """Extract the sequence from supplied parent sequence using the FeatureLocation object.
@@ -1513,6 +1568,12 @@ class CompoundLocation:
     def ref_db(self):
         """Not present in CompoundLocation, dummy method for API compatibility."""
         return None
+
+    def rotate(self, shift, N):
+        locations = [location.rotate(shift, N).parts for location in self.parts]
+        #Appiattisco l'array
+        final_locations = [elem for it in locations for elem in it]
+        return CompoundLocation(final_locations, self.operator)
 
     def extract(self, parent_sequence):
         """Extract the sequence from supplied parent sequence using the CompoundLocation object.
