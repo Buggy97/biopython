@@ -1061,6 +1061,7 @@ class SeqRecord:
         if (self.annotations["topology"]!="circular"):
             raise Exception("Topology is not circular!")
         #Shifta la sequenza
+        shift = -shift
         self.seq = self.seq[shift:] + self.seq[:shift]
         #Aggiorna le posizioni delle features
         for feature in self.features:
