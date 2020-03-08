@@ -1064,7 +1064,7 @@ class SeqRecord:
         self.seq = self.seq[shift:] + self.seq[:shift]
         #Aggiorna le posizioni delle features
         for feature in self.features:
-            feature.location.rotate(shift, len(self.seq)+1)
+            feature.location = feature.location.rotate(shift, len(self.seq)+1)
         #Aggiorna le per letter_annotation
         for arr in self.letter_annotations:
             arr = arr[shift:] + arr[:shift]

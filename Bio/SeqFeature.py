@@ -1139,17 +1139,21 @@ class FeatureLocation:
             raise
 
     def rotate(self, shift, N):
-        position_start = self._shift_position(self._start, shift, N)
-        position_end = self._shift_position(self._end, shift, N)
-        if (position_start > position_end):
-            #Get middle location
-            position_middle_1 = self._shift_position(self._start, -self._start, N)
-            position_middle_2 = self._shift_position(position_end, N-int(position_end)-1, N)
-            f1 = FeatureLocation(position_start, position_middle_2, self.strand)
-            f2 = FeatureLocation(position_middle_1, position_end, self.strand)
-            return CompoundLocation([f1, f2])
+        #Caso di feature che copre l'intera sequenza, pur ruotandola resta invariata
+        if self.start == 0 and self.end == N-1:
+            return self
         else:
-            return FeatureLocation(position_start, position_end, self.strand)
+            position_start = self._shift_position(self._start, shift, N)
+            position_end = self._shift_position(self._end, shift, N)
+            if (position_start > position_end):
+                #Get middle location
+                position_middle_1 = self._shift_position(self._start, -self._start, N)
+                position_middle_2 = self._shift_position(position_end, N-int(position_end)-1, N)
+                f1 = FeatureLocation(position_start, position_middle_2, self.strand)
+                f2 = FeatureLocation(position_middle_1, position_end, self.strand)
+                return CompoundLocation([f1, f2])
+            else:
+                return FeatureLocation(position_start, position_end, self.strand)
 
     def extract(self, parent_sequence):
         """Extract the sequence from supplied parent sequence using the FeatureLocation object.
