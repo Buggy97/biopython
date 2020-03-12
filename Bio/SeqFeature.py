@@ -1139,21 +1139,26 @@ class FeatureLocation:
             raise
 
     def rotate(self, shift, N):
-        #Caso di feature che copre l'intera sequenza, pur ruotandola resta invariata
-        if self.start == 0 and self.end == N-1:
-            return self
+        position_start = self._shift_position(self._start, shift, N)
+        position_end = self._shift_position(self._end, shift, N)
+        if (position_start > position_end):
+            #Get middle location
+            position_middle_1 = self._shift_position(self._start, -self._start, N) #conserva il tipo di location
+            position_middle_2 = self._shift_position(position_end, N-int(position_end)-1, N)
+            f1 = FeatureLocation(position_start, position_middle_2, self.strand, ref=self.ref, ref_db=self.ref_db)
+            f2 = FeatureLocation(position_middle_1, position_end, self.strand, ref=self.ref, ref_db=self.ref_db)
+
+            #location1 - location2 attaccate 
+            #if f2.start - 1 == f1.end:
+              # return FeatureLocation(f1.start,f2.end, self.strand, ref=self.ref, ref_db=self.ref_db)
+                    
+            #location2 - location1 attaccate 
+            if f1.start - 1 == f2.end:
+                return FeatureLocation(f2.start,f1.end, self.strand, ref=self.ref, ref_db=self.ref_db)
+                
+            return CompoundLocation([f2, f1])
         else:
-            position_start = self._shift_position(self._start, shift, N)
-            position_end = self._shift_position(self._end, shift, N)
-            if (position_start > position_end):
-                #Get middle location
-                position_middle_1 = self._shift_position(self._start, -self._start, N)
-                position_middle_2 = self._shift_position(position_end, N-int(position_end)-1, N)
-                f1 = FeatureLocation(position_start, position_middle_2, self.strand)
-                f2 = FeatureLocation(position_middle_1, position_end, self.strand)
-                return CompoundLocation([f1, f2])
-            else:
-                return FeatureLocation(position_start, position_end, self.strand)
+            return FeatureLocation(position_start, position_end, self.strand, ref=self.ref, ref_db=self.ref_db)
 
     def extract(self, parent_sequence):
         """Extract the sequence from supplied parent sequence using the FeatureLocation object.
@@ -1574,10 +1579,39 @@ class CompoundLocation:
         return None
 
     def rotate(self, shift, N):
-        locations = [location.rotate(shift, N).parts for location in self.parts]
-        #Appiattisco l'array
-        final_locations = [elem for it in locations for elem in it]
-        return CompoundLocation(final_locations, self.operator)
+        locations_tmp = [location.rotate(shift, N).parts for location in self.parts]
+        locations = []
+        for loc in locations_tmp:
+            locations = locations + loc
+        to_append = []
+        to_delete = []
+        for location1 in locations:
+            for location2 in locations:
+                if location1 is not location2:
+                    #location1 - location2 attaccate 
+                    if location2.start - 1 == location1.end:
+                        tmp_feature = FeatureLocation(location1.start,location2.end,location1.strand, ref=location1.ref, ref_db=location1.ref_db)
+                        if tmp_feature not in to_append:
+                            to_append.append(tmp_feature)
+                        to_delete.append(location1)
+                        to_delete.append(location2)
+                            
+                    #location2 - location1 attaccate 
+                    if location1.start - 1 == location2.end:
+                        tmp_feature = FeatureLocation(location2.start,location1.end,location2.strand, ref=location1.ref, ref_db=location1.ref_db)
+                        if tmp_feature not in to_append:
+                            to_append.append(tmp_feature)
+                        to_delete.append(location1)
+                        to_delete.append(location2)
+        
+        locations = list(filter(lambda a: a not in to_delete, locations)) + to_append
+
+        if len(locations) == 1: #tutte le feature della compound sono state contratte
+            return locations[0]
+        else:
+            locations.sort(key=lambda loc: loc.start)
+            return CompoundLocation(locations, self.operator)
+
 
     def extract(self, parent_sequence):
         """Extract the sequence from supplied parent sequence using the CompoundLocation object.

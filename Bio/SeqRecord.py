@@ -1061,14 +1061,14 @@ class SeqRecord:
         if (self.annotations["topology"]!="circular"):
             raise Exception("Topology is not circular!")
         #Shifta la sequenza
-        shift = -shift
+        #shift = -shift
         self.seq = self.seq[shift:] + self.seq[:shift]
         #Aggiorna le posizioni delle features
         for feature in self.features:
             feature.location = feature.location.rotate(shift, len(self.seq)+1)
         #Aggiorna le per letter_annotation
-        for arr in self.letter_annotations:
-            arr = arr[shift:] + arr[:shift]
+        for i in self.letter_annotations.keys():
+            self.letter_annotations[i] = self.letter_annotations[i][shift:] + self.letter_annotations[i][:shift]
 
     def reverse_complement(
         self,
