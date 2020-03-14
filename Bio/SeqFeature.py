@@ -1038,45 +1038,37 @@ class FeatureLocation:
             strand=flip_strand,
         )
 
+        """ Returns a shifted position given position, shift and N, where 
+        position is the given position, shift is the amount and N is the length of the sequence
+        """
     def _shift_position(self, position, shift, N):
-        #Caso ExactPosition
         if type(position)==ExactPosition:
             position_new = (int(position) + shift) % N
             return ExactPosition(position_new)
         if type(position)==UncertainPosition:
             position_new = (int(position) + shift) % N
             return UncertainPosition(position_new)
-        #Caso UnknownPosition
         if type(position)==UnknownPosition:
             return position
-        #Caso WithinPosition
         if type(position)==WithinPosition:
             position_curr_default = int(position)
-            #Ricava il valore di left right usando la rappresentazione in stringa
-            #Elimina le parentesi e converte i valori separati da punto in interi
+            #Get left and right values by using string representation
+            #Delete parenthesis and converts values separated by dot into integers
             position_curr_left_right = list(map(int, str(position)[1:-1].split('.'))) 
-
             position_new_default = (position_curr_default + shift) % N
             position_new_left = (position_curr_left_right[0] + shift) % N
             position_new_right = (position_curr_left_right[1] + shift) % N
-
             return WithinPosition(position_new_default, position_new_left, position_new_right)
-        #Caso BeforePosition
         if type(position)==BeforePosition:
             position_new = (int(position) + shift) % N
             return BeforePosition(position_new)
-        #Caso AfterPosition
         if type(position)==AfterPosition:
             position_new = (int(position) + shift) % N
             return AfterPosition(position_new)
-        #Caso OneOfPosition
         if type(position)==OneOfPosition:
             position_curr_default = int(position)
-            #Ricava il valore di left right usando la rappresentazione in stringa
-            #Elimina le parentesi e converte i valori separati da virgola in interi
             position_new_default = (position_curr_default + shift) % N
             new_choices = [self._shift_position(pos, shift, N) for pos in position.position_choices]
-            #Riordino le posizioni in base alla posizione
             new_choices.sort()
             return OneOfPosition(position_new_default, new_choices)
 
@@ -1138,25 +1130,23 @@ class FeatureLocation:
                 return None
             raise
 
+        """Returns a rotated location  given shift and N, where shift is the amount and N is the length of the sequence.
+        Special case 1: if the shift is large enough the feature could be broken in two separated regions, so it becomes a 
+        CompoundLocation including the two regions.
+        Special case 2: if the feature length is N, it doesn't get broken in two regions since they would be contigous.
+        """
     def rotate(self, shift, N):
         position_start = self._shift_position(self._start, shift, N)
         position_end = self._shift_position(self._end, shift, N)
         if (position_start > position_end):
             #Get middle location
-            position_middle_1 = self._shift_position(self._start, -self._start, N) #conserva il tipo di location
+            position_middle_1 = self._shift_position(self._start, -self._start, N) #To preserve the type of position
             position_middle_2 = self._shift_position(position_end, N-int(position_end)-1, N)
             f1 = FeatureLocation(position_start, position_middle_2, self.strand, ref=self.ref, ref_db=self.ref_db)
-            f2 = FeatureLocation(position_middle_1, position_end, self.strand, ref=self.ref, ref_db=self.ref_db)
-
-            #location1 - location2 attaccate 
-            #if f2.start - 1 == f1.end:
-              # return FeatureLocation(f1.start,f2.end, self.strand, ref=self.ref, ref_db=self.ref_db)
-                    
-            #location2 - location1 attaccate 
+            f2 = FeatureLocation(position_middle_1, position_end, self.strand, ref=self.ref, ref_db=self.ref_db)   
             if f1.start - 1 == f2.end:
-                return FeatureLocation(f2.start,f1.end, self.strand, ref=self.ref, ref_db=self.ref_db)
-                
-            return CompoundLocation([f2, f1])
+                return FeatureLocation(f2.start,f1.end, self.strand, ref=self.ref, ref_db=self.ref_db) #Special case 2
+            return CompoundLocation([f2, f1]) #Special case 1
         else:
             return FeatureLocation(position_start, position_end, self.strand, ref=self.ref, ref_db=self.ref_db)
 
@@ -1578,6 +1568,10 @@ class CompoundLocation:
         """Not present in CompoundLocation, dummy method for API compatibility."""
         return None
 
+        """Returns a rotated location  given shift and N, where shift is the amount and N is the length of the sequence.
+        Special Case: if the shift is large enough, separated regions could become contiguos, so must be joined into a single one.
+        If all regions become contigous it returns a FeatureLocation. 
+        """
     def rotate(self, shift, N):
         locations_tmp = [location.rotate(shift, N).parts for location in self.parts]
         locations = []
@@ -1588,25 +1582,22 @@ class CompoundLocation:
         for location1 in locations:
             for location2 in locations:
                 if location1 is not location2:
-                    #location1 - location2 attaccate 
+                    #location1 - location2, in order 
                     if location2.start - 1 == location1.end:
                         tmp_feature = FeatureLocation(location1.start,location2.end,location1.strand, ref=location1.ref, ref_db=location1.ref_db)
                         if tmp_feature not in to_append:
                             to_append.append(tmp_feature)
                         to_delete.append(location1)
                         to_delete.append(location2)
-                            
-                    #location2 - location1 attaccate 
+                    #location2 - location1, in order
                     if location1.start - 1 == location2.end:
                         tmp_feature = FeatureLocation(location2.start,location1.end,location2.strand, ref=location1.ref, ref_db=location1.ref_db)
                         if tmp_feature not in to_append:
                             to_append.append(tmp_feature)
                         to_delete.append(location1)
                         to_delete.append(location2)
-        
-        locations = list(filter(lambda a: a not in to_delete, locations)) + to_append
-
-        if len(locations) == 1: #tutte le feature della compound sono state contratte
+        locations = list(filter(lambda a: a not in to_delete, locations)) + to_append #Updated locations
+        if len(locations) == 1: #Special case 
             return locations[0]
         else:
             locations.sort(key=lambda loc: loc.start)
